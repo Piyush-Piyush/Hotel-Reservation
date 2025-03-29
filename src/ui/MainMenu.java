@@ -83,6 +83,7 @@ public class MainMenu {
         }
     }
 
+
     static void findAndReserveRoom(Scanner sc) {
         while (true) {
             try {
@@ -142,7 +143,6 @@ public class MainMenu {
         }
     }
 
-
     private static void handleAlternativeRooms(Scanner sc, Date checkIn, Date checkOut) {
         Collection<IRoom> alternativeRooms = reservationService.findOtherRecommendedRooms(checkIn, checkOut);
         if (alternativeRooms.isEmpty()) {
@@ -150,7 +150,9 @@ public class MainMenu {
         } else {
             System.out.println("Rooms available on alternative dates:");
             displayRooms(alternativeRooms);
-            reserveRoom(sc, checkIn, checkOut, alternativeRooms);
+            Date newCheckInDate = ReservationService.addBufferDays(checkIn);
+            Date newCheckOutDate = ReservationService.addBufferDays(checkOut);
+            reserveRoom(sc, newCheckInDate, newCheckOutDate, alternativeRooms);
         }
     }
 
@@ -189,9 +191,16 @@ public class MainMenu {
         }
 
         IRoom room = reservationService.getARoom(roomNumber);
-        Reservation reservation = reservationService.reserveARoom(customer, room, checkIn, checkOut);
-        System.out.println("Booking successful! Here are your reservation details:\n" + reservation);
+
+        // Check room availability before reserving
+        try {
+            Reservation reservation = reservationService.reserveARoom(customer, room, checkIn, checkOut);
+            System.out.println("Booking successful! Here are your reservation details:\n" + reservation);
+        } catch (IllegalStateException e) {
+            System.out.println(e.getMessage());
+        }
     }
+
 
     static void displayMyReservations(Scanner sc) {
         System.out.println("Please enter your email address (e.g., name@domain.com):");

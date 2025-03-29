@@ -3,11 +3,12 @@ package service;
 import model.Customer;
 import model.IRoom;
 import model.Reservation;
-
 import java.util.*;
 
 
 public class ReservationService    {
+
+    private static final int bufferDays = 7;
 
     public static ReservationService reservationService = new ReservationService();
 
@@ -32,13 +33,25 @@ public class ReservationService    {
         return rooms.get(roomId);
     }
 
-    public Reservation reserveARoom(Customer customer, IRoom room, Date checkInDate, Date checkOutDate) {
-        Reservation reservation = new Reservation(customer, room, checkInDate, checkOutDate);
-        List<Reservation> reservationsForCustomer = reservations.get(customer.getEmail());
-        if(reservationsForCustomer == null) {
-            reservationsForCustomer = new ArrayList<Reservation>();
-            reservations.put(customer.getEmail(), reservationsForCustomer);
+    private boolean isRoomAvailable(IRoom room, Date checkInDate, Date checkOutDate) {
+        for (List<Reservation> reservationsForCustomer : reservations.values()) {
+            for (Reservation reservation : reservationsForCustomer) {
+                if (reservation.getRoom().getRoomNumber().equals(room.getRoomNumber()) &&
+                        !(checkOutDate.before(reservation.getCheckInDate()) || checkInDate.after(reservation.getCheckOutDate()))) {
+                    return false; // Room is already booked
+                }
+            }
         }
+        return true; // Room is available
+    }
+
+    public Reservation reserveARoom(Customer customer, IRoom room, Date checkInDate, Date checkOutDate) {
+        if (!isRoomAvailable(room, checkInDate, checkOutDate)) {
+            throw new IllegalStateException("This room is already booked for the selected dates");
+        }
+
+        Reservation reservation = new Reservation(customer, room, checkInDate, checkOutDate);
+        List<Reservation> reservationsForCustomer = reservations.computeIfAbsent(customer.getEmail(), k -> new ArrayList<Reservation>());
         reservationsForCustomer.add(reservation);
         return reservation;
     }
@@ -50,7 +63,6 @@ public class ReservationService    {
         }
         return allReservations;
     }
-
 
     public Collection<IRoom> findRooms(Date checkInDate, Date checkOutDate) {
         List<IRoom> vacantRooms = new ArrayList<IRoom>(rooms.values());
@@ -74,8 +86,7 @@ public class ReservationService    {
         return customerReservations;
     }
 
-
-        public void printAllReservations () {
+    public void printAllReservations () {
             Collection<Reservation> allReservations = getAllReservations();
             if(allReservations.isEmpty()) {
                 System.out.println("No reservations to display.");
@@ -86,11 +97,9 @@ public class ReservationService    {
             }
         }
 
-
-        public Collection<IRoom> getAllRooms () {
+    public Collection<IRoom> getAllRooms () {
             return rooms.values();
         }
-
 
     public Collection<IRoom> findOtherRecommendedRooms(Date checkInDate, Date checkOutDate) {
         Collection<IRoom> availableRooms = reservationService.findRooms(checkInDate, checkOutDate);
@@ -98,21 +107,24 @@ public class ReservationService    {
             return availableRooms;
         }
 
-        Date newCheckInDate = addBufferDays(checkInDate, 7);
-        Date newCheckOutDate = addBufferDays(checkOutDate, 7);
+        Date newCheckInDate = addBufferDays(checkInDate);
+        Date newCheckOutDate = addBufferDays(checkOutDate);
+
+        System.out.println("NewCheckInDate: " + newCheckInDate);
+        System.out.println("NewCheckOutDate: " + newCheckOutDate);
 
         Collection<IRoom> recommendedRooms = reservationService.findRooms(newCheckInDate, newCheckOutDate);
 
         return recommendedRooms.isEmpty() ? Collections.emptyList() : recommendedRooms;
     }
 
-    public static Date addBufferDays(final Date date, int daysToAdd) {
+    public static Date addBufferDays(final Date date) {
         if (date == null) {
             throw new IllegalArgumentException("Date cannot be null");
         }
         Calendar calendar = Calendar.getInstance();
         calendar.setTime(date);
-        calendar.add(Calendar.DAY_OF_MONTH, daysToAdd);
+        calendar.add(Calendar.DAY_OF_MONTH, bufferDays);
         return calendar.getTime();
     }
 
